@@ -1,0 +1,205 @@
+# =============================================================================
+# StreamSentinel — Docker Compose (Local Development)
+# =============================================================================
+# 
+# 
+#
+# Usage:
+#   docker compose up -d          # start all services in background
+#   docker compose logs -f        # tail all logs
+#   docker compose down -v        # stop and remove volumes
+#
+# Services started:
+#   - Zookeeper + Kafka (local broker replacing Confluent Cloud)
+#   - Kafka UI       (browse topics at http://localhost:8080)
+#   - Redis          (live feature store)
+#   - TimescaleDB    (labelled event storage)
+#   - Grafana        (live metrics dashboard at http://localhost:3000)
+#   - MLflow         (experiment tracking at http://localhost:5000)
+# =============================================================================
+
+version: "3.9"
+
+networks:
+  streamsentinel:
+    driver: bridge
+
+volumes:
+  kafka_data:
+  zookeeper_data:
+  redis_data:
+  timescale_data:
+  grafana_data:
+  mlflow_data:
+
+services:
+
+  # ---------------------------------------------------------------------------
+  # Zookeeper — required by Kafka for cluster metadata
+  # ---------------------------------------------------------------------------
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.6.1
+    container_name: ss_zookeeper
+    networks: [streamsentinel]
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    volumes:
+      - zookeeper_data:/var/lib/zookeeper/data
+    healthcheck:
+      test: ["CMD", "bash", "-c", "echo 'ruok' | nc localhost 2181"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ---------------------------------------------------------------------------
+  # Kafka Broker
+  # ---------------------------------------------------------------------------
+  kafka:
+    image: confluentinc/cp-kafka:7.6.1
+    container_name: ss_kafka
+    depends_on:
+      zookeeper:
+        condition: service_healthy
+    networks: [streamsentinel]
+    ports:
+      - "9050:9050"          # external access from host
+      
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: "zookeeper:2181"
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9050
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_NUM_PARTITIONS: 3
+      KAFKA_LOG_RETENTION_HOURS: 168      # 7 days
+      KAFKA_JMX_PORT: 9101
+    volumes:
+      - kafka_data:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD", "kafka-broker-api-versions", "--bootstrap-server", "localhost:9050"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+
+  # ---------------------------------------------------------------------------
+  # Kafka Topic Initialiser — creates topics on first run
+  # ---------------------------------------------------------------------------
+  kafka-init:
+    image: confluentinc/cp-kafka:7.6.1
+    container_name: ss_kafka_init
+    depends_on:
+      kafka:
+        condition: service_healthy
+    networks: [streamsentinel]
+    entrypoint: ["/bin/bash", "-c"]
+    command: |
+      "
+      kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists \
+        --topic market.ticks --partitions 3 --replication-factor 1
+      kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists \
+        --topic orderbook.l2 --partitions 3 --replication-factor 1
+      kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists \
+        --topic news.feed --partitions 1 --replication-factor 1
+      kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists \
+        --topic anomaly.scores --partitions 3 --replication-factor 1
+      echo 'Topics created.'
+      "
+    restart: "no"
+
+  # ---------------------------------------------------------------------------
+  # Kafka UI — browse topics and messages at http://localhost:8080
+  # ---------------------------------------------------------------------------
+  kafka-ui:
+    image: provectuslabs/kafka-ui:v0.7.2
+    container_name: ss_kafka_ui
+    depends_on:
+      kafka:
+        condition: service_healthy
+    networks: [streamsentinel]
+    ports:
+      - "8080:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
+
+  # ---------------------------------------------------------------------------
+  # Redis — live feature store
+  # ---------------------------------------------------------------------------
+  redis:
+    image: redis:7.2-alpine
+    container_name: ss_redis
+    networks: [streamsentinel]
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ---------------------------------------------------------------------------
+  # TimescaleDB — labelled event storage (PostgreSQL + time-series extension)
+  # ---------------------------------------------------------------------------
+  timescaledb:
+    image: timescale/timescaledb:latest-pg16
+    container_name: ss_timescaledb
+    networks: [streamsentinel]
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: streamsentinel
+      POSTGRES_USER: streamsentinel
+      POSTGRES_PASSWORD: streamsentinel_dev_password
+    volumes:
+      - timescale_data:/var/lib/postgresql/data
+   
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U streamsentinel"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ---------------------------------------------------------------------------
+  # Grafana — live metrics dashboard at http://localhost:3000
+  # Default login: admin / admin
+  # ---------------------------------------------------------------------------
+  grafana:
+    image: grafana/grafana:11.0.0
+    container_name: ss_grafana
+    networks: [streamsentinel]
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ../dashboard/grafana_config/provisioning:/etc/grafana/provisioning
+    depends_on:
+      timescaledb:
+        condition: service_healthy
+
+  # ---------------------------------------------------------------------------
+  # MLflow Tracking Server — experiment UI at http://localhost:5000
+  # ---------------------------------------------------------------------------
+  mlflow:
+    image: ghcr.io/mlflow/mlflow:v2.14.1
+    container_name: ss_mlflow
+    networks: [streamsentinel]
+    ports:
+      - "5000:5000"
+    command: >
+      mlflow server
+        --host 0.0.0.0
+        --port 5000
+        --backend-store-uri sqlite:///mlflow.db
+        --default-artifact-root /mlflow/artifacts
+    volumes:
+      - mlflow_data:/mlflow

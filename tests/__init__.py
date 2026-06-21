@@ -1,0 +1,1 @@
+# StreamSentinel: tests package

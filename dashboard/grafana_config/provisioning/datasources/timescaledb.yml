@@ -1,0 +1,28 @@
+# StreamSentinel — Grafana datasource provisioning
+#
+# Auto-provisioned at container startup. Tells Grafana where to find the
+# TimescaleDB instance for operational dashboards. Today the dashboards
+# query a `predictions` table that does not yet exist — they show
+# "no data" panels. When the streaming loop is extended to write
+# anomaly events to TimescaleDB (future work documented in the report),
+# the dashboards will populate without further configuration.
+
+apiVersion: 1
+
+datasources:
+  - name: TimescaleDB
+    type: postgres
+    access: proxy
+    url: timescaledb:5432
+    database: streamsentinel
+    user: streamsentinel
+    secureJsonData:
+      password: streamsentinel_dev_password
+    jsonData:
+      sslmode: disable
+      maxOpenConns: 10
+      maxIdleConns: 2
+      connMaxLifetime: 14400
+      postgresVersion: 1600
+      timescaledb: true
+    editable: true

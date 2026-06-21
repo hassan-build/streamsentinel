@@ -1,0 +1,38 @@
+{
+  "n_rows_total": 100000,
+  "n_symbols": 5,
+  "symbols": [
+    "AAPL",
+    "MSFT",
+    "NVDA",
+    "SPY",
+    "TSLA"
+  ],
+  "label_counts": {
+    "0": 95709,
+    "5": 1833,
+    "3": 1542,
+    "2": 662,
+    "4": 131,
+    "1": 123
+  },
+  "anomaly_rate_observed": 0.04291,
+  "args": {
+    "n_events": 100000,
+    "anomaly_rate_target": 0.15,
+    "seed": 42,
+    "splits": [
+      0.7,
+      0.15,
+      0.15
+    ],
+    "block_size": 50
+  },
+  "split_paths": {
+    "train": "data\\synthetic\\train.parquet",
+    "val": "data\\synthetic\\val.parquet",
+    "test": "data\\synthetic\\test.parquet"
+  },
+  "generation_time_seconds": 17.70711898803711,
+  "schema_version": "1.0.0"
+}

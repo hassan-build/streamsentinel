@@ -1,0 +1,312 @@
+# =============================================================================
+# StreamSentinel Configuration
+# =============================================================================
+# Central configuration file for all modules.
+# Override any value with an environment variable using the pattern:
+#   STREAMSENTINEL__<SECTION>__<KEY>  (double underscores as separators)
+# e.g. STREAMSENTINEL__KAFKA__BOOTSTRAP_SERVERS=localhost:9092
+#
+# NEVER commit real API keys. Use .env for secrets (see .env.example).
+# =============================================================================
+
+project:
+  name: StreamSentinel
+  version: "1.0.0"
+  description: >
+    Real-time adaptive anomaly detection for financial market microstructure
+    events using streaming LLMs and Graph Neural Networks.
+  seed: 42                         # Global random seed for reproducibility
+
+# -----------------------------------------------------------------------------
+# Kafka / Confluent Cloud
+# -----------------------------------------------------------------------------
+kafka:
+  bootstrap_servers: "${KAFKA_BOOTSTRAP_SERVERS}"   # e.g. pkc-xxx.us-east-1.aws.confluent.cloud:9092
+  security_protocol: SASL_SSL
+  sasl_mechanism: PLAIN
+  sasl_username: "${KAFKA_API_KEY}"
+  sasl_password: "${KAFKA_API_SECRET}"
+  topics:
+    ticks: market.ticks
+    orderbook: orderbook.l2
+    news: news.feed
+    anomalies: anomaly.scores          # output topic written by the AI layer
+  producer:
+    acks: all
+    retries: 3
+    batch_size: 16384                  # bytes
+    linger_ms: 5
+    compression_type: snappy
+  consumer:
+    group_id: streamsentinel-consumer
+    auto_offset_reset: earliest
+    enable_auto_commit: false
+    max_poll_records: 500
+
+# -----------------------------------------------------------------------------
+# Data Sources
+# -----------------------------------------------------------------------------
+data_sources:
+  alpaca:
+    base_url: "https://paper-api.alpaca.markets"
+    data_url: "https://data.alpaca.markets"
+    api_key: "${ALPACA_API_KEY}"
+    api_secret: "${ALPACA_API_SECRET}"
+    symbols:                           # assets to track
+      - AAPL
+      - MSFT
+      - TSLA
+      - SPY
+      - NVDA
+    feed: iex                          # iex = free tier; sip = paid
+    orderbook_depth: 10                # levels of L2 order book to capture
+
+  polygon:
+    api_key: "${POLYGON_API_KEY}"
+    base_url: "https://api.polygon.io"
+
+  newsapi:
+    api_key: "${NEWSAPI_KEY}"
+    base_url: "https://newsapi.org/v2"
+    query_terms:
+      - "stock market manipulation"
+      - "SEC investigation"
+      - "flash crash"
+      - "market volatility"
+    page_size: 100
+    lookback_hours: 24
+
+  gdelt:
+    base_url: "https://api.gdeltproject.org/api/v2/doc/doc"
+    mode: artlist
+    maxrecords: 250
+    format: json
+
+# -----------------------------------------------------------------------------
+# Stream Processing (Spark Structured Streaming)
+# -----------------------------------------------------------------------------
+spark:
+  app_name: StreamSentinel
+  master: local[*]                     # swap to yarn/k8s in production
+  streaming:
+    trigger_interval: "2 seconds"
+    watermark_delay: "10 seconds"
+    checkpoint_location: "/tmp/streamsentinel/checkpoints"
+  windows:
+    short_ms: 5000                     # 5-second window for tick features
+    medium_ms: 60000                   # 1-minute window
+    long_ms: 300000                    # 5-minute window for macro context
+  delta_lake:
+    path: "${DELTA_LAKE_PATH}"         # e.g. gs://streamsentinel-data/delta
+    raw_ticks: "raw/ticks"
+    raw_orderbook: "raw/orderbook"
+    raw_news: "raw/news"
+    features: "features/engineered"
+    anomalies: "results/anomalies"
+
+# -----------------------------------------------------------------------------
+# Storage
+# -----------------------------------------------------------------------------
+redis:
+  host: "${REDIS_HOST:-localhost}"
+  port: 6379
+  password: "${REDIS_PASSWORD:-}"
+  db: 0
+  ttl_seconds: 3600                    # live state expiry
+  prefixes:
+    orderbook: "ob:"
+    features: "feat:"
+    graph_state: "graph:"
+
+timescaledb:
+  host: "${TIMESCALE_HOST:-localhost}"
+  port: 5432
+  database: streamsentinel
+  user: "${TIMESCALE_USER:-streamsentinel}"
+  password: "${TIMESCALE_PASSWORD}"
+  schema: public
+  tables:
+    anomaly_events: anomaly_events
+    trade_labels: trade_labels
+
+# -----------------------------------------------------------------------------
+# Graph Construction
+# -----------------------------------------------------------------------------
+graph:
+  node_feature_dim: 64                 # dimensionality of node feature vectors
+  edge_feature_dim: 16
+  max_nodes: 50                        # max assets in the graph at one time
+  update_interval_ms: 1000             # how often to refresh edges
+  edge_threshold: 0.3                  # minimum correlation to add an edge
+  lookback_window: 300                 # seconds of history for correlation
+
+# -----------------------------------------------------------------------------
+# Models
+# -----------------------------------------------------------------------------
+models:
+  gnn:
+    architecture: GAT                  # Graph Attention Network (vs GCN, GraphSAGE)
+    hidden_channels: 128
+    num_layers: 3
+    heads: 4                           # attention heads (GAT only)
+    dropout: 0.3
+    output_dim: 64
+
+  finbert:
+    model_name: "ProsusAI/finbert"     # HuggingFace model ID
+    max_length: 512
+    output_dim: 768                    # FinBERT hidden size
+    batch_size: 16
+    device: "cuda"                     # falls back to cpu automatically
+    cache_dir: "./.model_cache"
+
+  fusion:
+    gnn_dim: 64
+    text_dim: 768
+    cross_attention_heads: 8
+    fusion_hidden_dim: 256
+    dropout: 0.2
+    output_dim: 128
+
+  anomaly_scorer:
+    threshold_method: adaptive_cusum   # options: fixed, adaptive_cusum
+    cusum_k: 0.5                       # allowance parameter
+    cusum_h: 5.0                       # decision threshold
+    fixed_threshold: 0.65              # used only when method=fixed
+    anomaly_classes:
+      - normal
+      - spoofing
+      - layering
+      - flash_crash
+      - coordinated_trading
+      - liquidity_shock
+
+# -----------------------------------------------------------------------------
+# Training
+# -----------------------------------------------------------------------------
+training:
+  epochs: 50
+  batch_size: 32
+  learning_rate: 0.001
+  weight_decay: 0.0001
+  scheduler: cosine                    # options: step, cosine, none
+  early_stopping_patience: 10
+  val_split: 0.15
+  test_split: 0.15
+  class_weights: balanced              # handles class imbalance from synthetic data
+  checkpoint_dir: "./checkpoints"
+  device: "cuda"                       # auto-falls back to cpu
+
+# -----------------------------------------------------------------------------
+# Synthetic Anomaly Injection
+# -----------------------------------------------------------------------------
+synthetic:
+  seed: 42
+  anomaly_rate: 0.15                   # fraction of windows to inject anomalies
+  scenarios:
+    spoofing:
+      enabled: true
+      order_size_multiplier: [5, 20]   # range of fake order sizes (x normal)
+      cancel_delay_ms: [10, 200]       # how quickly orders are cancelled
+      n_layers: [3, 8]
+    layering:
+      enabled: true
+      n_levels: [3, 10]                # number of fake price levels
+      price_spread_bps: [5, 30]        # spread of fake orders in basis points
+      lifetime_ms: [100, 2000]
+    flash_crash:
+      enabled: true
+      price_drop_pct: [2, 15]          # % price drop
+      duration_ms: [200, 5000]
+      recovery_ratio: [0.5, 1.0]       # how much price recovers
+    coordinated_trading:
+      enabled: true
+      n_accounts: [3, 10]
+      sync_window_ms: [50, 500]
+      direction: random                # buy, sell, or random
+    liquidity_shock:
+      enabled: true
+      depth_reduction_pct: [50, 95]    # % of book depth removed
+      duration_ms: [500, 10000]
+
+# -----------------------------------------------------------------------------
+# Evaluation
+# -----------------------------------------------------------------------------
+evaluation:
+  output_dir: "./evaluation/results"
+  metrics:
+    - auroc
+    - f1
+    - precision
+    - recall
+    - average_precision
+    - latency_p50_ms
+    - latency_p95_ms
+    - throughput_per_second
+    - shap_consistency_variance
+  n_bootstrap: 1000                    # for confidence intervals
+  latency_warmup_rounds: 100           # discard first N for JIT warmup
+  export_formats:
+    - csv
+    - json
+  ablations:
+    - name: no_llm
+      description: "GNN only — FinBERT encoder removed"
+      disable: [finbert]
+    - name: static_graph
+      description: "Fixed graph topology — no dynamic edge updates"
+      disable: [dynamic_graph_updater]
+    - name: fixed_threshold
+      description: "Static 0.65 threshold — no adaptive CUSUM"
+      disable: [adaptive_cusum]
+    - name: full_system
+      description: "StreamSentinel complete — all components active"
+      disable: []
+
+# -----------------------------------------------------------------------------
+# Explainability
+# -----------------------------------------------------------------------------
+explainability:
+  shap:
+    background_samples: 100            # samples for SHAP KernelExplainer baseline
+    n_explain: 500                     # number of test samples to explain
+    output_dir: "./explainability/outputs"
+    save_plots: true
+    consistency_trials: 10             # repeat SHAP n times, measure variance
+  attention:
+    save_heatmaps: true
+    output_dir: "./explainability/attention_maps"
+
+# -----------------------------------------------------------------------------
+# MLflow Experiment Tracking
+# -----------------------------------------------------------------------------
+mlflow:
+  tracking_uri: "${MLFLOW_TRACKING_URI:-./mlruns}"
+  experiment_name: StreamSentinel
+  artifact_location: "${MLFLOW_ARTIFACT_LOCATION:-./mlruns/artifacts}"
+  tags:
+    project: streamsentinel
+    author: "${AUTHOR_NAME:-dissertation}"
+    version: "1.0.0"
+
+# -----------------------------------------------------------------------------
+# FastAPI Inference Service
+# -----------------------------------------------------------------------------
+api:
+  host: "0.0.0.0"
+  port: 8000
+  workers: 2
+  log_level: info
+  model_checkpoint: "./checkpoints/best_model.pt"
+  max_batch_size: 64
+  inference_timeout_ms: 500            # hard deadline per request
+
+# -----------------------------------------------------------------------------
+# Logging
+# -----------------------------------------------------------------------------
+logging:
+  level: INFO                          # DEBUG, INFO, WARNING, ERROR
+  format: "%(asctime)s | %(levelname)-8s | %(name)s | %(message)s"
+  file: "./logs/streamsentinel.log"
+  rotation: "100 MB"
+  retention: "7 days"

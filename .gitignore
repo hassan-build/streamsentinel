@@ -1,0 +1,74 @@
+# ─────────────────────────────────────────────────────────────
+# StreamSentinel — .gitignore
+# ─────────────────────────────────────────────────────────────
+
+# Secrets — NEVER commit these
+.env
+.env.local
+*.key
+*.pem
+.secrets/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg
+build/
+dist/
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# IDE / editor
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Logs
+logs/
+*.log
+
+# Model artefacts — these are large and regenerable
+checkpoints/
+.model_cache/
+*.pt
+*.pth
+*.ckpt
+mlruns/
+
+# Generated outputs — regenerable from seed
+evaluation/results/
+explainability/outputs/
+explainability/attention_maps/
+
+# Generated data — ~50MB Parquet files
+# Keep these IF you want examiners to have the exact dataset.
+# Comment the next line out to commit them.
+data/synthetic/*.parquet
+data/raw/
+
+# Docker volumes / runtime
+deployment/volumes/
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+
+# OS junk
+.DS_Store
+*.bak
+*.tmp
+
+# Old extracted module zips from build sessions
+*_extracted/

@@ -1,0 +1,29 @@
+# =============================================================================
+# StreamSentinel — Ruff Linter Configuration
+# =============================================================================
+[ruff]
+line-length = 100
+target-version = "py311"
+
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "B",   # flake8-bugbear (catches common bugs)
+    "C4",  # flake8-comprehensions
+    "UP",  # pyupgrade (modern Python idioms)
+]
+
+ignore = [
+    "E501",  # line too long — handled by black
+    "B008",  # function calls in default args (FastAPI depends on this)
+]
+
+exclude = [
+    ".git",
+    ".venv",
+    "__pycache__",
+    "*.egg-info",
+    "mlruns/",
+]

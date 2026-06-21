@@ -1,0 +1,98 @@
+{
+  "title": "StreamSentinel — Operational",
+  "uid": "streamsentinel-ops",
+  "schemaVersion": 38,
+  "version": 1,
+  "refresh": "10s",
+  "timezone": "browser",
+  "tags": ["streamsentinel", "anomaly-detection"],
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "Anomaly rate (rolling 5 min)",
+      "datasource": {"type": "postgres", "uid": "TimescaleDB"},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "color": {"mode": "palette-classic"}
+        },
+        "overrides": []
+      },
+      "options": {"legend": {"displayMode": "list", "placement": "bottom"}},
+      "targets": [{
+        "format": "time_series",
+        "rawSql": "SELECT time_bucket('1 minute', ts) AS time, AVG(is_anomaly::int)::float AS anomaly_rate FROM predictions WHERE ts > now() - interval '1 hour' GROUP BY 1 ORDER BY 1",
+        "refId": "A"
+      }]
+    },
+    {
+      "id": 2,
+      "type": "barchart",
+      "title": "Latest anomaly score by symbol",
+      "datasource": {"type": "postgres", "uid": "TimescaleDB"},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "color": {"mode": "thresholds"},
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "yellow", "value": 0.5},
+              {"color": "red", "value": 0.75}
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {"orientation": "horizontal"},
+      "targets": [{
+        "format": "table",
+        "rawSql": "SELECT DISTINCT ON (symbol) symbol, anomaly_score FROM predictions ORDER BY symbol, ts DESC",
+        "refId": "A"
+      }]
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "Inference latency (p50, p95, p99)",
+      "datasource": {"type": "postgres", "uid": "TimescaleDB"},
+      "gridPos": {"h": 8, "w": 16, "x": 0, "y": 8},
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "color": {"mode": "palette-classic"}
+        },
+        "overrides": []
+      },
+      "targets": [{
+        "format": "time_series",
+        "rawSql": "SELECT time_bucket('30 seconds', ts) AS time, percentile_cont(0.50) WITHIN GROUP (ORDER BY latency_ms) AS p50, percentile_cont(0.95) WITHIN GROUP (ORDER BY latency_ms) AS p95, percentile_cont(0.99) WITHIN GROUP (ORDER BY latency_ms) AS p99 FROM predictions WHERE ts > now() - interval '1 hour' GROUP BY 1 ORDER BY 1",
+        "refId": "A"
+      }]
+    },
+    {
+      "id": 4,
+      "type": "piechart",
+      "title": "Predicted class distribution (last hour)",
+      "datasource": {"type": "postgres", "uid": "TimescaleDB"},
+      "gridPos": {"h": 8, "w": 8, "x": 16, "y": 8},
+      "options": {
+        "pieType": "donut",
+        "legend": {"displayMode": "list", "placement": "right"}
+      },
+      "targets": [{
+        "format": "table",
+        "rawSql": "SELECT predicted_class, COUNT(*) AS count FROM predictions WHERE ts > now() - interval '1 hour' GROUP BY predicted_class",
+        "refId": "A"
+      }]
+    }
+  ]
+}
