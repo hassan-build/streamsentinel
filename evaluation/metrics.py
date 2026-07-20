@@ -1,17 +1,7 @@
 """
 evaluation/metrics.py
 =====================
-Metrics library for the dissertation evaluation.
 
-Every metric reports a **bootstrap 95% confidence interval** in addition
-to the point estimate. Single point estimates with no uncertainty are not
-credible at the first-class level; the bootstrap CI is the standard
-way to attach statistical rigour without making distributional
-assumptions.
-
-Functions in this file are pure: given the same inputs and seed, they
-return the same outputs. All randomness flows from an explicit `seed`
-argument.
 """
 
 from __future__ import annotations
