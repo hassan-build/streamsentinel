@@ -3,12 +3,6 @@ evaluation/baselines/rule_based.py
 ==================================
 Rule-based threshold detector.
 
-This baseline answers the dissertation question:
-    "Does a learned ML model actually improve over a naive threshold rule?"
-
-It is intentionally simple: no training, no parameters fit on data. We
-compute a small set of hand-crafted z-scores from the order book features
-and flag a snapshot as anomalous if ANY of them exceeds a multiplier.
 
 Heuristics encoded
 ------------------
