@@ -33,10 +33,14 @@ jobs:
       - name: Run test suite
         env:
           KAFKA_BOOTSTRAP_SERVERS: localhost:9050
-          REDIS_HOST: localhost
-          REDIS_PORT: "6379"
-          API_HOST: 0.0.0.0
-          API_PORT: "8000"
+          KAFKA_API_KEY: dummy-ci-key
+          KAFKA_API_SECRET: dummy-ci-secret
+          ALPACA_API_KEY: dummy-ci-key
+          ALPACA_API_SECRET: dummy-ci-secret
+          NEWSAPI_KEY: dummy-ci-key
+          POLYGON_API_KEY: dummy-ci-key
+          TIMESCALE_PASSWORD: dummy-ci-password
+          DELTA_LAKE_PATH: /tmp/delta-lake
         run: |
           pytest tests/ --tb=short -v
       - name: Upload test artefacts on failure
