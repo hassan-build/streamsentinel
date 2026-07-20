@@ -10,7 +10,7 @@ dissertation:
   - consistency.json                   (SHAP variance across n_trials)
   - summary.md                         (narrative for dissertation chapter)
 
-Usage
+Usag
 -----
     # Fast smoke (~5 min on CPU)
     python -m explainability.run_explainability --n-samples 50 --n-trials 3
