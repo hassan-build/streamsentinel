@@ -15,8 +15,7 @@ Usage
     # Fast smoke (~5 min on CPU)
     python -m explainability.run_explainability --n-samples 50 --n-trials 3
 
-    # Dissertation-final run (longer)
-    python -m explainability.run_explainability --full
+
 """
 
 from __future__ import annotations
