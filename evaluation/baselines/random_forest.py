@@ -4,17 +4,11 @@ evaluation/baselines/random_forest.py
 Random Forest baseline — a strong tabular ML benchmark with NO graph
 structure and NO text input.
 
-This baseline answers the dissertation question:
-    "Does the graph structure (and the GNN) buy us anything over a
-    strong off-the-shelf tabular model?"
 
-If StreamSentinel's GNN doesn't significantly beat the Random Forest,
-the entire graph architecture is overengineered. The RF therefore acts
-as the **structural justification** for the GNN.
 
 Design notes
 ------------
-- We use the per-snapshot features that are independent of the graph:
+- i use the per-snapshot features that are independent of the graph:
   spread_bps, trade_imbalance, order_cancel_rate, top-5 size sums,
   log-returns over short and medium windows. These are exactly the
   features a non-graph practitioner would engineer.
