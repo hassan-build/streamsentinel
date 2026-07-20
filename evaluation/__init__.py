@@ -1,4 +1,4 @@
-"""StreamSentinel — evaluation package.
+"""StreamSentinel  evaluation package.
 
 Public API:
   - ModelMetrics, MetricEstimate, LatencyEstimate (data classes)

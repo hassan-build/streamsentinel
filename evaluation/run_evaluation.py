@@ -1,7 +1,7 @@
 """
 evaluation/run_evaluation.py
 ============================
-The one-command dissertation evaluation pipeline.
+
 
 Runs:
   1. Three baselines (rule-based, RF, unimodal GNN)

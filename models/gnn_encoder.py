@@ -3,7 +3,7 @@ models/gnn_encoder.py
 =====================
 Graph Attention Network (GAT) encoder for the StreamSentinel asset graph.
 
-We use GAT (Veličković et al. 2018) over GCN or GraphSAGE because the
+I use GAT (Veličković et al. 2018) over GCN or GraphSAGE because the
 attention coefficients are intrinsically interpretable: for any given
 node prediction we can ask "which neighbour did the model attend to?"
 This is the foundation for the attention-visualisation chapter of the

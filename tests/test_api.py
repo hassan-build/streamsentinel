@@ -3,7 +3,7 @@ tests/test_api.py
 =================
 Tests for the FastAPI service and streaming loop.
 
-We use FastAPI's TestClient with mocked Kafka + Redis so the tests run
+i use FastAPI's TestClient with mocked Kafka + Redis so the tests run
 without real infrastructure. The streaming-loop tests exercise the
 real loop with a mock consumer that yields synthetic records.
 """

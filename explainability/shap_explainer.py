@@ -3,29 +3,13 @@ explainability/shap_explainer.py
 ================================
 SHAP attribution for StreamSentinel predictions.
 
-We use **KernelSHAP** (Lundberg & Lee 2017) rather than DeepSHAP because:
+i use **KernelSHAP** (Lundberg & Lee 2017) rather than DeepSHAP because:
   1. Our pipeline includes a graph-message-passing layer that DeepSHAP's
      tensor-rewriting approach doesn't handle cleanly.
   2. KernelSHAP is model-agnostic — it treats the model as a black box,
      which avoids any tight coupling to the internal architecture.
 
-Attribution is computed at the **named node-feature level**: the 10
-features defined in `graph/graph_builder.py: FEATURE_NAMES`. We do NOT
-attribute at the edge level (would require ~25 attributions per sample
-for a 5-node graph) or at the text-token level (out of scope for this
-dissertation).
 
-Consistency analysis
---------------------
-A single SHAP run depends on the randomly-sampled "background" data
-(the reference baseline against which counterfactuals are constructed).
-Running SHAP n times with different background samples gives n
-attribution vectors per sample. If the top-k features are consistent
-across runs, the explanation is trustworthy; if they vary wildly, the
-explanation is noisy.
-
-We report the consistency variance via
-`evaluation.metrics.shap_consistency_variance`.
 """
 
 from __future__ import annotations

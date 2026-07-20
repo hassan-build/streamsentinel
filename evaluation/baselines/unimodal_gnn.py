@@ -4,13 +4,7 @@ evaluation/baselines/unimodal_gnn.py
 Unimodal GNN baseline — the full GNN encoder + classifier, with NO
 FinBERT and NO fusion.
 
-This baseline answers the dissertation question:
-    "Does fusing text with the graph improve detection?"
 
-If the unimodal GNN matches or exceeds the full StreamSentinel system,
-the cross-attention fusion is dead weight. This is the most important
-baseline for the dissertation — it directly isolates the headline
-architectural contribution.
 
 Implementation strategy
 -----------------------
