@@ -3,7 +3,7 @@ tests/test_ingestion.py
 =======================
 Tests for the ingestion module.
 
-We use a **mock Kafka client** rather than a real broker. The mock
+I use a **mock Kafka client** rather than a real broker. The mock
 satisfies the same interface as confluent_kafka.Producer / Consumer so
 the tests exercise the same code paths the production CLI does — they
 just record messages in memory instead of writing to a network socket.
