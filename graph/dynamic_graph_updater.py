@@ -7,10 +7,7 @@ The updater maintains a rolling buffer of the most recent snapshots per
 symbol. As new data streams in, it decides when to emit a fresh graph
 (throttled by `update_interval_ms`) and produces it on demand.
 
-This module also implements the **static-graph ablation** required by
-the dissertation evaluation: calling `freeze()` locks the current edge
-structure, after which graphs continue to refresh node features but
-keep the same topology. `unfreeze()` returns to fully dynamic mode.
+
 """
 
 from __future__ import annotations
